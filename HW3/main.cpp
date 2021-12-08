@@ -1,5 +1,7 @@
 #include <stdlib.h>
 #include <iostream>
+#include <FreeImage.h>
+#include <limits>
 // OSX systems need their own headers
 #ifdef __APPLE__
 #include <OpenGL/gl3.h>
@@ -14,10 +16,13 @@
 #include <glm/glm.hpp>
 #include "Screenshot.h"
 #include "Scene.h"
+#include "Ray.h"
+#include "Intersection.h"
+#include "Triangle.h"
 
 
-static const int width = 800;
-static const int height = 600;
+static const int width = 160;
+static const int height = 120;
 static const char* title = "Scene viewer";
 static const glm::vec4 background(0.1f, 0.2f, 0.3f, 1.0f);
 static Scene scene;
@@ -127,8 +132,108 @@ void specialKey(int key, int x, int y){
     }
 }
 
+void saveimg(std::vector<BYTE> pixels, const char* filename) {
+
+    // You need to get your image into the pixel vector.  How you do so is up to you.
+    // Also, make sure you follow the directions in the writeup, and call FreeImage_Initialise() before using this function.
+
+    FIBITMAP* img = FreeImage_ConvertFromRawBits(pixels.data(), width, height, width * 3, 24, 0xFF0000, 0x00FF00, 0x0000FF, false);
+
+    std::cout << "Saving screenshot: " << filename << std::endl;
+
+    FreeImage_Save(FIF_PNG, img, filename, 0);
+}
+
+Ray rayThruPixel(Camera* cam, int i, int j) {
+    float a = 2.f * (float(i) + 0.5) / float(width) - 1; // alpha
+    float b = 1.f - 2.f * (float(j) + 0.5) / float(height); //beta
+
+    glm::vec3 w = normalize(cam->eye - cam->target);
+    glm::vec3 u = normalize(cross(cam->up, w));
+    glm::vec3 v = cross(w, u);
+
+    glm::vec3 dir = normalize(a * u + b * v - w);
+    return Ray(cam->eye, dir);
+}
+
+Intersection intersect(Ray* ray, Triangle* tri) {
+    float pd = dot(tri->n, tri->p1);
+    float t = -(dot(tri->n, ray->origin) + pd) / dot(tri->n, ray->dir);
+    return Intersection(ray, tri, t);
+}
+
+
+// find closest intersection in scene
+Intersection intersect(Ray* ray) {
+    float mindist = std::numeric_limits<float>::infinity();
+    Intersection hit;
+    for each (Triangle* obj in scene) {
+        Intersection hit_temp = intersect(ray, obj);
+        if (hit_temp.dis < mindist) {
+            // TODO: handle negative distance
+            mindist = hit_temp.dis;
+            hit = hit_temp;
+        }
+    }
+    return hit;
+}
+
+//generate rays to light sources from a given point
+std::vector<Ray> genRaysToLights(glm::vec3 pt) {
+
+}
+
+//generates color from shading model
+glm::vec3 shadingModel(Intersection* hit) {
+
+}
+
+std::vector<Ray> genMirrorRays() {
+
+}
+
+glm::vec3 findColor(Intersection* hit, int depth) {
+    if (depth < 3) { // limit on recursion depth
+        std::vector<Ray> toLights = genRaysToLights(hit->poi());
+        glm::vec3 color = shadingModel(hit);
+
+        // recurse on mirrored rays of light
+        std::vector<Ray> mirror = genMirrorRays();
+        for each (Ray m in mirror) {
+            Intersection hit2 = intersect(&m);
+            color = color + findColor(&hit2, depth + 1);
+        }
+        
+        return color;
+    } else {
+        return glm::vec3(0, 0, 0);
+    }
+}
+
+std::vector<BYTE> raytrace() {
+    std::vector<BYTE> image;
+    Camera* cam = scene.camera;
+    for (int j = 0; j < height; j++) {
+        for (int i = 0; i < width; i++) {
+            Ray ray = rayThruPixel(cam, i, j);
+            Intersection hit = intersect(&ray);
+            glm::vec3 color = findColor(&hit);
+
+            image.push_back(int(color.x * 255));
+            image.push_back(int(color.y * 255));
+            image.push_back(int(color.z * 255));
+        }
+    }
+    return image;
+}
+
+
+
 int main(int argc, char** argv)
 {
+    /*
+
+
     // BEGIN CREATE WINDOW
     glutInit(&argc, argv);
     
@@ -155,5 +260,12 @@ int main(int argc, char** argv)
     glutSpecialFunc(specialKey);
     
     glutMainLoop();
+
+    */
+    FreeImage_Initialise();
+    std::vector<BYTE> img = raytrace();
+    saveimg(img, "output.png");
+
+
 	return 0;   /* ANSI C requires main to return int. */
 }

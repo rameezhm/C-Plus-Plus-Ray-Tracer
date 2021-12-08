@@ -102,6 +102,9 @@
     <ClInclude Include="include\Screenshot.h" />
     <ClInclude Include="include\Shader.h" />
     <ClInclude Include="include\SurfaceShader.h" />
+    <ClInclude Include="Intersection.h" />
+    <ClInclude Include="Ray.h" />
+    <ClInclude Include="Triangle.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
