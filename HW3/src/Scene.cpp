@@ -7,12 +7,14 @@ Scene.cpp contains the implementation of the draw command
 
 // The scene init definition 
 #include "Scene.inl"
+#include <iostream>
 
 
 using namespace glm;
 void Scene::draw(void){
     // Pre-draw sequence: assign uniforms that are the same for all Geometry::draw call.  These uniforms include the camera view, proj, and the lights.  These uniform do not include modelview and material parameters.
     camera -> computeMatrices();
+    /*
     shader -> view = camera -> view;
     shader -> projection = camera -> proj;
     shader -> nlights = light.size();
@@ -24,7 +26,8 @@ void Scene::draw(void){
         shader -> lightcolors[ count ] = (entry.second) -> color;
         count++;
     }
-    
+    */
+
     // Define stacks for depth-first search (DFS)
     std::stack < Node* > dfs_stack;
     std::stack < mat4 >  matrix_stack; // HW3: You will update this matrix_stack during the depth-first search while loop.
@@ -58,14 +61,20 @@ void Scene::draw(void){
             // Prepare to draw the geometry. Assign the modelview and the material.
             
             // (HW3 hint: you should do something here)
-            shader -> modelview = cur_VM * cur -> modeltransforms[i]; // HW3: Without updating cur_VM, modelview would just be camera's view matrix.
-            shader -> material  = ( cur -> models[i] ) -> material;
+            //shader -> modelview = cur_VM * cur -> modeltransforms[i]; // HW3: Without updating cur_VM, modelview would just be camera's view matrix.
+            //shader -> material  = ( cur -> models[i] ) -> material;
             
             
             
             // The draw command
-            shader -> setUniforms();
+            //shader -> setUniforms();
             ( cur -> models[i] ) -> geometry -> draw();
+            
+            std::vector<Triangle> geoTris = (cur->models[i])->geometry->triangles;
+            for (int j = 0; j < geoTris.size(); j++) {
+                triList.push_back(geoTris[j]);
+            }
+
         }
         
         // Continue the DFS: put all the child nodes of the current node in the stack

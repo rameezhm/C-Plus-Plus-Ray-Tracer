@@ -18,6 +18,7 @@
 #include "Geometry.h"
 #include "Material.h"
 #include "Model.h"
+#include "../Triangle.h"
 
 #ifndef __SCENE_H__
 #define __SCENE_H__
@@ -42,6 +43,8 @@ public:
     
     // The container of nodes will be the scene graph after we connect the nodes by setting the child_nodes.
     std::map< std::string, Node* > node;
+
+    std::vector<Triangle> triList; //list of all triangles in the scene
     
     Scene(){
         // the default scene graph already has one node named "world."
@@ -76,7 +79,6 @@ public:
             delete entry.second;
         }
         delete camera;
-        delete shader;
     }
 };
 

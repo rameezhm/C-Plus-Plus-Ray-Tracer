@@ -28,6 +28,7 @@ static const glm::vec4 background(0.1f, 0.2f, 0.3f, 1.0f);
 static Scene scene;
 
 #include "hw3AutoScreenshots.h"
+#include <Obj.h>
 
 void printHelp(){
     std::cout << R"(
@@ -99,7 +100,7 @@ void keyboard(unsigned char key, int x, int y){
             glutPostRedisplay();
             break;
         case 'l':
-            scene.shader -> enablelighting = !(scene.shader -> enablelighting);
+            //scene.shader -> enablelighting = !(scene.shader -> enablelighting);
             glutPostRedisplay();
             break;
         case ' ':
@@ -156,10 +157,32 @@ Ray rayThruPixel(Camera* cam, int i, int j) {
     return Ray(cam->eye, dir);
 }
 
+// ---------------- INTERSECTION FUNCTIONS ----------------------------------------------------------------------------
+
+// compute intersection between ray and triangle
 Intersection intersect(Ray* ray, Triangle* tri) {
     float pd = dot(tri->n, tri->p1);
     float t = -(dot(tri->n, ray->origin) + pd) / dot(tri->n, ray->dir);
-    return Intersection(ray, tri, t);
+
+    // is intersection inside triangle
+    //edges
+    glm::vec3 e1 = tri->p2 - tri->p1;
+    glm::vec3 e2 = tri->p3 - tri->p2;
+    glm::vec3 e3 = tri->p1 - tri->p3;
+
+    glm::vec3 pt = ray->origin + t * ray->dir;
+
+    glm::vec3 c1 = cross(e1, pt - tri->p1);
+    glm::vec3 c2 = cross(e2, pt - tri->p2);
+    glm::vec3 c3 = cross(e3, pt - tri->p3);
+
+    float val1 = dot(tri->n, cross(e1, c1));
+    float val2 = dot(tri->n, cross(e2, c2));
+    float val3 = dot(tri->n, cross(e3, c3));
+
+    bool inside = val1 > 0 &&  val2 > 0 &&  val3 > 0;
+
+    return Intersection(ray, tri, t, inside);
 }
 
 
@@ -167,10 +190,11 @@ Intersection intersect(Ray* ray, Triangle* tri) {
 Intersection intersect(Ray* ray) {
     float mindist = std::numeric_limits<float>::infinity();
     Intersection hit;
-    for each (Triangle* obj in scene) {
-        Intersection hit_temp = intersect(ray, obj);
-        if (hit_temp.dis < mindist) {
-            // TODO: handle negative distance
+
+    for each (Triangle obj in scene.triList) { 
+        Intersection hit_temp = intersect(ray, &obj);
+        //intersection must be in triangle and not have negative distance
+        if (hit_temp.dis < mindist && hit_temp.in && hit_temp.dis > 0) {
             mindist = hit_temp.dis;
             hit = hit_temp;
         }
@@ -178,27 +202,73 @@ Intersection intersect(Ray* ray) {
     return hit;
 }
 
-//generate rays to light sources from a given point
-std::vector<Ray> genRaysToLights(glm::vec3 pt) {
+// ------------ COLORING FUNCTIONS ------------------------------------------------------------------------------------
 
+//generate rays to light sources from a given point
+std::vector<Ray> genRaysToLights(Ray* in) {
+    glm::vec3 pt = in->origin;
+    std::vector<Ray> rays;
+    for (auto& l: scene.light) {
+        glm::vec3 lightPos = glm::vec3(l.second->position.x, l.second->position.y, l.second->position.z);
+        // origin of new ray is slightly elevated to avoid intersection with current object
+        rays.push_back(Ray(pt + (in->dir) * -0.1f, normalize( lightPos - pt) ) ); 
+    }
+    return rays;
+}
+
+//gets lights corresponding to the rays in genRaysToLights
+std::vector<Light*> getLights() {
+    std::vector<Light*> lights;
+    for (auto& l : scene.light) {
+        lights.push_back(l.second);
+    }
+    return lights;
 }
 
 //generates color from shading model
-glm::vec3 shadingModel(Intersection* hit) {
+glm::vec3 shadingModel(Intersection* hit, std::vector<Ray> toLights) {
+    // material properties for silver (using silver for shading model)
+    glm::vec3 ambient = glm::vec3(0.1f, 0.1f, 0.1f);
+    glm::vec3 diffuse = glm::vec3(0.2f, 0.2f, 0.2f);
+    glm::vec3 specular = glm::vec3(0.9f, 0.9f, 0.9f);
+    float shininess = 50.0f;
 
+    std::vector<Light*> lights = getLights();
+    glm::vec3 color(0,0,0);
+    for (int i = 0; i < toLights.size(); i++) {
+        Intersection lhit = intersect(&toLights[i]);
+
+        // if the ray to the light source intersects some part of the scene, then don't shade it (shadow)
+        if (!lhit.in) {
+            return glm::vec3(0, 0, 0);
+        }
+        //otherwise use standard shading model
+        glm::vec3 lColor = glm::vec3(lights[i]->color.x, lights[i]->color.y, lights[i]->color.z);
+        color = color + diffuse * lColor * glm::max(dot(-hit->ray->dir, toLights[i].dir),0.f);
+    }
+    return color;
 }
 
-std::vector<Ray> genMirrorRays() {
 
+// generate mirror reflected rays
+std::vector<Ray> genMirrorRays(Ray* in, std::vector<Ray> fromLight, glm::vec3 origin) {
+    std::vector<Ray> out;
+    for each (Ray i in fromLight) {
+        // origin of new ray is slightly elevated to avoid intersection with current object
+        out.push_back(Ray(origin + in->dir * -0.1f, normalize(2 * dot(-in->dir, i.dir) * -in->dir - i.dir)));
+    }
+
+    return out;
 }
 
+// find the color of a given pixel by adding results of multiple light bounces
 glm::vec3 findColor(Intersection* hit, int depth) {
-    if (depth < 3) { // limit on recursion depth
-        std::vector<Ray> toLights = genRaysToLights(hit->poi());
-        glm::vec3 color = shadingModel(hit);
+    if (depth < 2 && hit->in) { // limit on recursion depth
+        std::vector<Ray> toLights = genRaysToLights(hit->ray);
+        glm::vec3 color = shadingModel(hit, toLights);
 
         // recurse on mirrored rays of light
-        std::vector<Ray> mirror = genMirrorRays();
+        std::vector<Ray> mirror = genMirrorRays(hit->ray, toLights, hit->poi());
         for each (Ray m in mirror) {
             Intersection hit2 = intersect(&m);
             color = color + findColor(&hit2, depth + 1);
@@ -210,20 +280,27 @@ glm::vec3 findColor(Intersection* hit, int depth) {
     }
 }
 
+// --------- RAYTRACING FRAMEWORK -------------------------------------------------------------------------------------
+
 std::vector<BYTE> raytrace() {
     std::vector<BYTE> image;
     Camera* cam = scene.camera;
+    std::cout << "TriList Size: " << scene.triList.size() << std::endl;
     for (int j = 0; j < height; j++) {
         for (int i = 0; i < width; i++) {
             Ray ray = rayThruPixel(cam, i, j);
             Intersection hit = intersect(&ray);
-            glm::vec3 color = findColor(&hit);
+            glm::vec3 color = findColor(&hit, 0);
 
             image.push_back(int(color.x * 255));
             image.push_back(int(color.y * 255));
             image.push_back(int(color.z * 255));
         }
+        if (j % 1 == 0) {
+            std::cout << "Row " << j << " of " << height << " done" << std::endl;
+        }
     }
+    std::cout << "Raytrace complete" << std::endl;
     return image;
 }
 
@@ -263,6 +340,8 @@ int main(int argc, char** argv)
 
     */
     FreeImage_Initialise();
+    scene.init(); 
+    scene.draw();
     std::vector<BYTE> img = raytrace();
     saveimg(img, "output.png");
 

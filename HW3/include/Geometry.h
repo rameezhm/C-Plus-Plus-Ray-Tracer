@@ -23,24 +23,27 @@ we do not need to manually allocate/free the memory for
 arrays of unknown size.
 *****************************************************/
 #include <vector>
+#include "../Triangle.h"
 
 #ifndef __GEOMETRY_H__
 #define __GEOMETRY_H__
 
 class Geometry {
 public:
+    std::vector<Triangle> triangles; // list of triangles that make up the object
+    /*
     GLenum mode = GL_TRIANGLES; // the cookboook for glDrawElements
     int count; // number of elements to draw
     GLenum type = GL_UNSIGNED_INT; // type of the index array
     GLuint vao; // vertex array object a.k.a. geometry spreadsheet
     std::vector<GLuint> buffers; // data storage
-    
+    */
     virtual void init(){};
     virtual void init(const char* s){};
     
     void draw(void){
-        glBindVertexArray(vao);
-        glDrawElements(mode,count,type,0);
+        //glBindVertexArray(vao);
+        //glDrawElements(mode,count,type,0);
     }
 };
 

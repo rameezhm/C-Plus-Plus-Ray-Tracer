@@ -76,8 +76,16 @@ void Obj::init(const char * filename){
         vertices[i] = temp_vertices[ temp_vertexIndices[i] - 1 ];
         normals[i] = temp_normals[ temp_normalIndices[i] - 1 ];
     }
+
+    //create list of all triangles of the object
+    for (int i = 0; i < n; i += 3) {
+        triangles.push_back(Triangle(vertices[i], vertices[i + 1], vertices[i + 2]));
+    }
+
     std::cout << "done." << std::endl;
     
+    /*
+
     // setting up buffers
     std::cout << "Setting up buffers...";
     glGenVertexArrays(1, &vao );
@@ -104,6 +112,7 @@ void Obj::init(const char * filename){
     count = n;
     glBindVertexArray(0);
     std::cout << "done." << std::endl;
+    */
 }
 
 

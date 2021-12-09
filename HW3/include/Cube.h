@@ -10,6 +10,7 @@ class Cube : public Geometry {
 public:
 
     void init(void){
+        /*
         // vertex positions
         const GLfloat positions[24][3] ={
             // Front face
@@ -72,6 +73,7 @@ public:
         
         count = sizeof(indices)/sizeof(indices[0]);
         glBindVertexArray(0);
+        */
     }
     
     
